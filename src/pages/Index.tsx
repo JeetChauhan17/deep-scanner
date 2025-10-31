@@ -26,7 +26,7 @@ const Index = () => {
     setUrlModalOpen(true);
   };
 
-  const handleScanSubmit = (url: string, type: 'phishing' | 'passive') => {
+  const handleScanSubmit = async (url: string, type: 'phishing' | 'passive') => {
     setScanningUrl(url);
     setLastScannedUrl(url);
     setScanType(type);
@@ -40,39 +40,142 @@ const Index = () => {
     };
     setMessages(prev => [...prev, userMessage]);
 
-    // Simulate scan with progress
-    setTimeout(() => {
+    try {
+      // Perform actual scan
+      const { fetchWebsiteContent, analyzeDomain, analyzeHTML } = await import('@/lib/scanService');
+      
+      // Step 1: Domain analysis
+      const domainAnalysis = analyzeDomain(url);
+      
+      // Step 2: Fetch website content
+      const websiteData = await fetchWebsiteContent(url);
+      
+      let scanResults = '';
+      
+      if (websiteData.error) {
+        scanResults = `**URL:** ${url}\n\n**Error:** Could not fetch website content - ${websiteData.error}\n\n**Domain Analysis:**\n`;
+        if (domainAnalysis.isSuspicious) {
+          scanResults += `⚠️ Domain flagged as suspicious:\n${domainAnalysis.reasons.map(r => `- ${r}`).join('\n')}`;
+        } else {
+          scanResults += `Domain appears structurally safe, but unable to verify content.`;
+        }
+        
+        if (domainAnalysis.brandImpersonation) {
+          scanResults += `\n\n🔴 **CRITICAL: Possible ${domainAnalysis.brandImpersonation.brand} impersonation detected (${Math.round(domainAnalysis.brandImpersonation.confidence)}% confidence)**`;
+        }
+      } else {
+        // Step 3: Analyze HTML content
+        const htmlAnalysis = analyzeHTML(websiteData.html || '', url);
+        
+        // Build comprehensive scan report
+        scanResults = `**URL:** ${url}\n\n`;
+        
+        // Domain Analysis
+        scanResults += `**DOMAIN ANALYSIS:**\n`;
+        if (domainAnalysis.isSuspicious) {
+          scanResults += `🔴 Suspicious domain detected:\n${domainAnalysis.reasons.map(r => `- ${r}`).join('\n')}\n\n`;
+        } else {
+          scanResults += `✅ Domain structure appears legitimate\n\n`;
+        }
+        
+        if (domainAnalysis.brandImpersonation) {
+          scanResults += `🔴 **BRAND IMPERSONATION ALERT:** Possible ${domainAnalysis.brandImpersonation.brand} impersonation (${Math.round(domainAnalysis.brandImpersonation.confidence)}% confidence)\n\n`;
+        }
+        
+        // Content Analysis
+        scanResults += `**CONTENT ANALYSIS:**\n`;
+        
+        if (htmlAnalysis.suspiciousForms.detected) {
+          scanResults += `🔴 ${htmlAnalysis.suspiciousForms.details}\n`;
+        }
+        
+        if (htmlAnalysis.suspiciousLinks.detected) {
+          scanResults += `⚠️ ${htmlAnalysis.suspiciousLinks.details}\n`;
+        }
+        
+        if (htmlAnalysis.suspiciousScripts.detected) {
+          scanResults += `🔴 ${htmlAnalysis.suspiciousScripts.details}\n`;
+        }
+        
+        if (htmlAnalysis.sslIssues.detected) {
+          scanResults += `🔴 ${htmlAnalysis.sslIssues.details}\n`;
+        }
+        
+        if (htmlAnalysis.brandImpersonation.detected) {
+          scanResults += `🔴 ${htmlAnalysis.brandImpersonation.details}\n`;
+        }
+        
+        if (!htmlAnalysis.suspiciousForms.detected && 
+            !htmlAnalysis.suspiciousLinks.detected && 
+            !htmlAnalysis.suspiciousScripts.detected && 
+            !htmlAnalysis.sslIssues.detected &&
+            !htmlAnalysis.brandImpersonation.detected) {
+          scanResults += `✅ No immediate threats detected in website content\n`;
+        }
+        
+        // Add HTML snippet for AI analysis (first 3000 chars)
+        const htmlSnippet = (websiteData.html || '').substring(0, 3000);
+        scanResults += `\n**HTML CONTENT SAMPLE:**\n\`\`\`html\n${htmlSnippet}\n\`\`\`\n`;
+      }
+      
+      // Send to AI for comprehensive analysis
+      const analysisPrompt = `Perform a comprehensive phishing and security analysis:\n\n${scanResults}\n\nProvide a detailed security assessment following the required format.`;
+      
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'user',
+        content: analysisPrompt,
+        timestamp: new Date(),
+      };
+      
+      const response = await sendMessageToGemini([...messages, userMessage, aiMessage]);
+      
       setScanningUrl(null);
       
-      if (type === 'phishing') {
-        // Demo phishing result
-        const result = url.includes('phish') || url.includes('suspicious') 
-          ? demoPhishingResults.suspicious 
-          : demoPhishingResults.benign;
-        
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: `Phishing Check Results for ${url}:\n\nVerdict: ${result.verdict.toUpperCase()}\nConfidence: ${Math.round(result.confidence * 100)}%\n\n${result.explanation}\n\nKey Indicators:\n${result.reasons.map(r => `• ${r.note}`).join('\n')}`,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-        toast.success('Phishing check completed');
-      } else {
-        // Demo site scan
-        setCurrentReport(demoSiteReport);
-        setInspectorOpen(true);
-        
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: `Security scan completed for ${url}.\n\n${demoSiteReport.summary}\n\nView detailed findings in the Inspector panel →`,
-          timestamp: new Date(),
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-        toast.success('Security scan completed');
-      }
-    }, 5000);
+      const assistantMessage: Message = {
+        id: (Date.now() + 2).toString(),
+        role: 'assistant',
+        content: response,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // Create report for inspector panel
+      const report = {
+        summary: scanResults,
+        confidence: 0.85,
+        findings: [
+          {
+            id: 'domain-analysis',
+            title: 'Domain Analysis',
+            severity: domainAnalysis.isSuspicious ? 'high' : 'low',
+            confidence: domainAnalysis.brandImpersonation ? 95 : (domainAnalysis.isSuspicious ? 80 : 20),
+            evidence: domainAnalysis.reasons.join(', '),
+            fix: domainAnalysis.isSuspicious ? 'Avoid this website - domain shows signs of malicious intent' : 'Domain appears safe',
+          },
+        ],
+        timestamp: new Date(),
+        rawOutput: response,
+      };
+      
+      setCurrentReport(report);
+      setInspectorOpen(true);
+      
+      toast.success('Security scan completed');
+      
+    } catch (error) {
+      console.error('Scan error:', error);
+      setScanningUrl(null);
+      toast.error('Scan failed. Please try again.');
+      
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Sorry, I encountered an error while scanning ${url}. Please check the URL and try again.`,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    }
   };
 
   const handleSendMessage = async (content: string) => {
