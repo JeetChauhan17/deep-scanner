@@ -8,13 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Shield, Menu, X } from "lucide-react";
 import { demoMessages, demoSiteReport, demoPhishingResults } from "@/lib/demoData";
 import { toast } from "sonner";
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
+import { sendMessageToGemini, type Message } from "@/lib/geminiService";
 
 const Index = () => {
   const [showApp, setShowApp] = useState(false);
@@ -79,7 +73,7 @@ const Index = () => {
     }, 5000);
   };
 
-  const handleSendMessage = (content: string) => {
+  const handleSendMessage = async (content: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -90,17 +84,22 @@ const Index = () => {
     
     setIsLoading(true);
     
-    // Demo response
-    setTimeout(() => {
+    try {
+      const response = await sendMessageToGemini([...messages, userMessage]);
+      
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'I understand your question. In production, I would analyze your query using AI and provide detailed security guidance. For now, try scanning a URL to see the security analysis in action!',
+        content: response,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error('Failed to get response from AI. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   if (!showApp) {
