@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Progress } from "@/components/ui/progress";
 
 interface Message {
   id: string;
@@ -16,6 +19,15 @@ interface ChatInterfaceProps {
   onSendMessage: (message: string) => void;
   isLoading?: boolean;
 }
+
+const extractConfidence = (content: string): number | null => {
+  const match = content.match(/\[CONFIDENCE:\s*(\d+)%\]/i);
+  return match ? parseInt(match[1]) : null;
+};
+
+const removeConfidenceTag = (content: string): string => {
+  return content.replace(/\[CONFIDENCE:\s*\d+%\]\s*/gi, '');
+};
 
 export const ChatInterface = ({ messages, onSendMessage, isLoading }: ChatInterfaceProps) => {
   const [input, setInput] = useState("");
@@ -70,7 +82,46 @@ export const ChatInterface = ({ messages, onSendMessage, isLoading }: ChatInterf
                       : 'glass-card border border-border'
                   }`}
                 >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                  {message.role === 'assistant' ? (
+                    <>
+                      {(() => {
+                        const confidence = extractConfidence(message.content);
+                        const cleanContent = removeConfidenceTag(message.content);
+                        return (
+                          <>
+                            {confidence !== null && (
+                              <div className="mb-4 p-3 rounded-lg bg-background/50 border border-border/50">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-medium text-muted-foreground">Confidence Score</span>
+                                  <span className="text-sm font-bold text-primary">{confidence}%</span>
+                                </div>
+                                <Progress value={confidence} className="h-2" />
+                              </div>
+                            )}
+                            <div className="prose prose-invert prose-sm max-w-none">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                components={{
+                                  h3: ({node, ...props}) => <h3 className="text-base font-heading font-bold mt-4 mb-2 text-foreground" {...props} />,
+                                  p: ({node, ...props}) => <p className="text-sm leading-relaxed mb-3 text-foreground" {...props} />,
+                                  ul: ({node, ...props}) => <ul className="text-sm space-y-1 mb-3" {...props} />,
+                                  li: ({node, ...props}) => <li className="text-sm text-foreground" {...props} />,
+                                  strong: ({node, ...props}) => <strong className="font-semibold text-foreground" {...props} />,
+                                  code: ({node, ...props}) => <code className="px-1.5 py-0.5 rounded bg-primary/20 text-primary text-xs font-mono" {...props} />,
+                                  a: ({node, ...props}) => <a className="text-primary hover:text-primary/80 underline" target="_blank" rel="noopener noreferrer" {...props} />,
+                                  blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-primary/50 pl-4 italic text-muted-foreground" {...props} />,
+                                }}
+                              >
+                                {cleanContent}
+                              </ReactMarkdown>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                  )}
                   <span className="text-xs text-muted-foreground mt-2 block">
                     {message.timestamp.toLocaleTimeString()}
                   </span>
