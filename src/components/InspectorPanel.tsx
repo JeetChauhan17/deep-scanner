@@ -3,6 +3,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Shield, Code, Wrench, Download, Copy } from "lucide-react";
+import { toast } from "sonner";
 
 interface Finding {
   id: string;
@@ -21,11 +22,138 @@ interface ScanReport {
   timestamp: Date;
 }
 
-interface InspectorPanelProps {
-  report: ScanReport | null;
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
 }
 
-export const InspectorPanel = ({ report }: InspectorPanelProps) => {
+interface InspectorPanelProps {
+  report: ScanReport | null;
+  messages?: Message[];
+  scannedUrl?: string;
+}
+
+export const InspectorPanel = ({ report, messages = [], scannedUrl }: InspectorPanelProps) => {
+  const handleDownloadReport = () => {
+    if (!report) return;
+
+    // Create comprehensive report for LLM continuation
+    const fullReport = {
+      metadata: {
+        exportDate: new Date().toISOString(),
+        reportVersion: "1.0",
+        scannedUrl: scannedUrl || "N/A",
+        scanTimestamp: report.timestamp.toISOString(),
+        purpose: "This report contains complete conversation context for resuming with any LLM"
+      },
+      conversationHistory: messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp.toISOString()
+      })),
+      scanReport: {
+        summary: report.summary,
+        overallConfidence: report.confidence,
+        findings: report.findings.map(f => ({
+          id: f.id,
+          title: f.title,
+          severity: f.severity,
+          confidence: f.confidence,
+          evidence: f.evidence,
+          remediation: f.fix
+        })),
+        rawOutputs: report.rawOutputs || "No raw outputs available"
+      },
+      resumeInstructions: {
+        howToResume: "To resume this conversation with an LLM, provide the conversationHistory and scanReport sections as context. You can reference specific findings by their ID.",
+        examplePrompt: `Based on the previous conversation and scan report for ${scannedUrl || "the target"}, please help me understand [your question here].`
+      }
+    };
+
+    // Create formatted text version for better readability
+    const textReport = `
+╔═══════════════════════════════════════════════════════════════╗
+║           ZERO DAY BOT - FULL SECURITY REPORT                 ║
+╚═══════════════════════════════════════════════════════════════╝
+
+METADATA
+========
+Export Date: ${new Date().toLocaleString()}
+Scanned URL: ${scannedUrl || "N/A"}
+Report Confidence: ${Math.round(report.confidence * 100)}%
+Scan Timestamp: ${report.timestamp.toLocaleString()}
+
+CONVERSATION HISTORY
+====================
+${messages.map((msg, i) => `
+[${i + 1}] ${msg.role.toUpperCase()} (${msg.timestamp.toLocaleTimeString()})
+${msg.content}
+${'─'.repeat(60)}
+`).join('\n')}
+
+EXECUTIVE SUMMARY
+=================
+${report.summary}
+
+FINDINGS (${report.findings.length} total)
+========
+${report.findings.map((finding, i) => `
+Finding #${i + 1}: ${finding.id}
+Title: ${finding.title}
+Severity: ${finding.severity.toUpperCase()}
+Confidence: ${Math.round(finding.confidence * 100)}%
+
+Evidence:
+${finding.evidence}
+
+Recommended Fix:
+${finding.fix}
+${'═'.repeat(60)}
+`).join('\n')}
+
+RAW OUTPUTS
+===========
+${report.rawOutputs || "No raw outputs captured during this scan."}
+
+RESUME INSTRUCTIONS
+===================
+This report contains the complete conversation context and scan results.
+To continue this conversation with any LLM:
+
+1. Provide the entire "CONVERSATION HISTORY" section as context
+2. Reference specific findings by their ID (e.g., "${report.findings[0]?.id}")
+3. The LLM can answer follow-up questions about any finding or suggest
+   additional security measures based on the scan results
+
+Example prompt to resume:
+"Based on the previous security scan of ${scannedUrl || "the target"}, 
+I need help understanding finding ${report.findings[0]?.id} and how to implement the fix."
+
+╔═══════════════════════════════════════════════════════════════╗
+║                    END OF REPORT                              ║
+╚═══════════════════════════════════════════════════════════════╝
+
+JSON DATA (for programmatic use)
+=================================
+${JSON.stringify(fullReport, null, 2)}
+`;
+
+    // Create and download the file
+    const blob = new Blob([textReport], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `zero-day-bot-report-${Date.now()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast.success('Report downloaded successfully! You can resume this conversation with any LLM.');
+  };
+
   if (!report) {
     return (
       <div className="flex items-center justify-center h-full p-8">
@@ -192,7 +320,10 @@ export const InspectorPanel = ({ report }: InspectorPanelProps) => {
 
         {/* Footer Actions */}
         <div className="border-t border-border p-4">
-          <Button className="w-full rounded-full glow-purple hover:glow-purple-strong transition-all">
+          <Button 
+            onClick={handleDownloadReport}
+            className="w-full rounded-full glow-purple hover:glow-purple-strong transition-all"
+          >
             <Download className="w-4 h-4 mr-2" />
             Download Full Report
           </Button>

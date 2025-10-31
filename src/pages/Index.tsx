@@ -14,6 +14,7 @@ const Index = () => {
   const [showApp, setShowApp] = useState(false);
   const [urlModalOpen, setUrlModalOpen] = useState(false);
   const [scanningUrl, setScanningUrl] = useState<string | null>(null);
+  const [lastScannedUrl, setLastScannedUrl] = useState<string>("");
   const [scanType, setScanType] = useState<'phishing' | 'passive'>('phishing');
   const [messages, setMessages] = useState<Message[]>(demoMessages);
   const [currentReport, setCurrentReport] = useState<any>(null);
@@ -27,6 +28,7 @@ const Index = () => {
 
   const handleScanSubmit = (url: string, type: 'phishing' | 'passive') => {
     setScanningUrl(url);
+    setLastScannedUrl(url);
     setScanType(type);
     
     // Add user message
@@ -156,7 +158,11 @@ const Index = () => {
 
         {/* Inspector Panel */}
         <div className={`w-full md:w-[400px] lg:w-[500px] border-l border-border bg-card/30 backdrop-blur-sm ${inspectorOpen ? 'flex' : 'hidden md:flex'} flex-col`}>
-          <InspectorPanel report={currentReport} />
+          <InspectorPanel 
+            report={currentReport} 
+            messages={messages}
+            scannedUrl={lastScannedUrl}
+          />
         </div>
       </div>
 
