@@ -30,7 +30,7 @@ const Index = () => {
     setScanningUrl(url);
     setLastScannedUrl(url);
     setScanType(type);
-    
+
     // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -43,15 +43,15 @@ const Index = () => {
     try {
       // Perform actual scan
       const { fetchWebsiteContent, analyzeDomain, analyzeHTML } = await import('@/lib/scanService');
-      
+
       // Step 1: Domain analysis
       const domainAnalysis = analyzeDomain(url);
-      
+
       // Step 2: Fetch website content
       const websiteData = await fetchWebsiteContent(url);
-      
+
       let scanResults = '';
-      
+
       if (websiteData.error) {
         scanResults = `**URL:** ${url}\n\n**Error:** Could not fetch website content - ${websiteData.error}\n\n**Domain Analysis:**\n`;
         if (domainAnalysis.isSuspicious) {
@@ -59,17 +59,17 @@ const Index = () => {
         } else {
           scanResults += `Domain appears structurally safe, but unable to verify content.`;
         }
-        
+
         if (domainAnalysis.brandImpersonation) {
           scanResults += `\n\n🔴 **CRITICAL: Possible ${domainAnalysis.brandImpersonation.brand} impersonation detected (${Math.round(domainAnalysis.brandImpersonation.confidence)}% confidence)**`;
         }
       } else {
         // Step 3: Analyze HTML content
         const htmlAnalysis = analyzeHTML(websiteData.html || '', url);
-        
+
         // Build comprehensive scan report
         scanResults = `**URL:** ${url}\n\n`;
-        
+
         // Domain Analysis
         scanResults += `**DOMAIN ANALYSIS:**\n`;
         if (domainAnalysis.isSuspicious) {
@@ -77,61 +77,61 @@ const Index = () => {
         } else {
           scanResults += `✅ Domain structure appears legitimate\n\n`;
         }
-        
+
         if (domainAnalysis.brandImpersonation) {
           scanResults += `🔴 **BRAND IMPERSONATION ALERT:** Possible ${domainAnalysis.brandImpersonation.brand} impersonation (${Math.round(domainAnalysis.brandImpersonation.confidence)}% confidence)\n\n`;
         }
-        
+
         // Content Analysis
         scanResults += `**CONTENT ANALYSIS:**\n`;
-        
+
         if (htmlAnalysis.suspiciousForms.detected) {
           scanResults += `🔴 ${htmlAnalysis.suspiciousForms.details}\n`;
         }
-        
+
         if (htmlAnalysis.suspiciousLinks.detected) {
           scanResults += `⚠️ ${htmlAnalysis.suspiciousLinks.details}\n`;
         }
-        
+
         if (htmlAnalysis.suspiciousScripts.detected) {
           scanResults += `🔴 ${htmlAnalysis.suspiciousScripts.details}\n`;
         }
-        
+
         if (htmlAnalysis.sslIssues.detected) {
           scanResults += `🔴 ${htmlAnalysis.sslIssues.details}\n`;
         }
-        
+
         if (htmlAnalysis.brandImpersonation.detected) {
           scanResults += `🔴 ${htmlAnalysis.brandImpersonation.details}\n`;
         }
-        
-        if (!htmlAnalysis.suspiciousForms.detected && 
-            !htmlAnalysis.suspiciousLinks.detected && 
-            !htmlAnalysis.suspiciousScripts.detected && 
-            !htmlAnalysis.sslIssues.detected &&
-            !htmlAnalysis.brandImpersonation.detected) {
+
+        if (!htmlAnalysis.suspiciousForms.detected &&
+          !htmlAnalysis.suspiciousLinks.detected &&
+          !htmlAnalysis.suspiciousScripts.detected &&
+          !htmlAnalysis.sslIssues.detected &&
+          !htmlAnalysis.brandImpersonation.detected) {
           scanResults += `✅ No immediate threats detected in website content\n`;
         }
-        
+
         // Add HTML snippet for AI analysis (first 3000 chars)
         const htmlSnippet = (websiteData.html || '').substring(0, 3000);
         scanResults += `\n**HTML CONTENT SAMPLE:**\n\`\`\`html\n${htmlSnippet}\n\`\`\`\n`;
       }
-      
+
       // Send to AI for comprehensive analysis
       const analysisPrompt = `Perform a comprehensive phishing and security analysis:\n\n${scanResults}\n\nProvide a detailed security assessment following the required format.`;
-      
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'user',
         content: analysisPrompt,
         timestamp: new Date(),
       };
-      
+
       const response = await sendMessageToGemini([...messages, userMessage, aiMessage]);
-      
+      console.log(response);
       setScanningUrl(null);
-      
+
       const assistantMessage: Message = {
         id: (Date.now() + 2).toString(),
         role: 'assistant',
@@ -139,7 +139,7 @@ const Index = () => {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, assistantMessage]);
-      
+
       // Create report for inspector panel
       const report = {
         summary: scanResults,
@@ -157,17 +157,17 @@ const Index = () => {
         timestamp: new Date(),
         rawOutput: response,
       };
-      
+
       setCurrentReport(report);
       setInspectorOpen(true);
-      
+
       toast.success('Security scan completed');
-      
+
     } catch (error) {
       console.error('Scan error:', error);
       setScanningUrl(null);
       toast.error('Scan failed. Please try again.');
-      
+
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -186,12 +186,12 @@ const Index = () => {
       timestamp: new Date(),
     };
     setMessages(prev => [...prev, userMessage]);
-    
+
     setIsLoading(true);
-    
+
     try {
       const response = await sendMessageToGemini([...messages, userMessage]);
-      
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -225,7 +225,7 @@ const Index = () => {
               <p className="text-xs text-muted-foreground">Security Assistant</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -235,7 +235,7 @@ const Index = () => {
             >
               New Scan
             </Button>
-            
+
             <Button
               variant="ghost"
               size="icon"
@@ -261,8 +261,8 @@ const Index = () => {
 
         {/* Inspector Panel */}
         <div className={`w-full md:w-[400px] lg:w-[500px] border-l border-border bg-card/30 backdrop-blur-sm ${inspectorOpen ? 'flex' : 'hidden md:flex'} flex-col`}>
-          <InspectorPanel 
-            report={currentReport} 
+          <InspectorPanel
+            report={currentReport}
             messages={messages}
             scannedUrl={lastScannedUrl}
           />
