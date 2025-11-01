@@ -287,3 +287,26 @@ function levenshteinDistance(str1: string, str2: string): number {
   
   return matrix[str2.length][str1.length];
 }
+
+
+export async function runSecurityScan(url: string) {
+  // later: integrate nmap/sqlmap here
+  return {
+    url,
+    scannedAt: new Date().toISOString(),
+    vulnerabilities: [
+      {
+        name: "Open Port 22 (SSH)",
+        severity: "medium",
+        description: "SSH port exposed to internet.",
+        fix: "Restrict access to trusted IPs or close the port if not needed."
+      },
+      {
+        name: "Missing X-Frame-Options Header",
+        severity: "low",
+        description: "No X-Frame-Options header found; site may be clickjacked.",
+        fix: "Add X-Frame-Options: DENY header in HTTP response."
+      }
+    ]
+  };
+}

@@ -10,7 +10,7 @@ export const Hero = ({ onStartScan }: HeroProps) => {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background with hero image */}
-      <div 
+      <div
         className="absolute inset-0 z-0"
         style={{
           backgroundImage: `url(${heroRings})`,
@@ -28,7 +28,7 @@ export const Hero = ({ onStartScan }: HeroProps) => {
           <div className="inline-flex items-center gap-2 glass-card px-4 py-2 rounded-full border border-primary/20 glow-purple">
             <Shield className="w-4 h-4 text-primary" />
             <span className="text-sm font-medium text-muted-foreground">
-              Production-Ready Security Assistant
+              The 3rd Bit
             </span>
           </div>
 
@@ -36,19 +36,17 @@ export const Hero = ({ onStartScan }: HeroProps) => {
           <h1 className="font-heading text-6xl md:text-7xl lg:text-8xl font-bold leading-tight">
             Zero Day Bot
           </h1>
-          
+
           <p className="text-2xl md:text-3xl text-primary font-heading">
-            Cybersecurity, simplified.
+            Detect. Defend. Educate.
+
           </p>
 
           {/* Tagline */}
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto">
-            A beautiful, human-first security assistant that turns complex scans into clear action.
+          <p className="text-xl md:text-xl text-muted-foreground max-w-2xl mx-auto">
+            Your Digital Guard Against Phishing and Online Scams
           </p>
 
-          <p className="text-lg text-muted-foreground/80">
-            No terminal — just secure.
-          </p>
 
           {/* CTA */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
@@ -61,13 +59,7 @@ export const Hero = ({ onStartScan }: HeroProps) => {
               Scan URL
             </Button>
 
-            <Button
-              variant="outline"
-              size="lg"
-              className="px-8 py-6 text-lg rounded-full border-primary/30 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300"
-            >
-              View Demo
-            </Button>
+
           </div>
 
           {/* Features */}

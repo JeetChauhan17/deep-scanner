@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 interface ScanProgressModalProps {
   open: boolean;
-  scanType: 'phishing' | 'passive';
+  scanType: 'phishing' | 'site';
 }
 
 interface ScanStage {

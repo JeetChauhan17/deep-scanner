@@ -17,9 +17,7 @@ You are **Zero Day Bot**, an expert cybersecurity analyst specializing in **phis
 
 ### DATA YOU RECEIVE
 You will receive:
-1. **URL and domain details** (including TLD, registrar, age, and pattern)
-2. **Optional metadata** (if available, e.g., SSL validity, redirects, headers)
-3. **No HTML or live content** (assume content inspection is unavailable)
+1. **URL**
 
 ---
 
@@ -37,7 +35,7 @@ If **one or more** of these are true:
 
 🟡 **MEDIUM RISK (50–79%) – Mark as SUSPICIOUS**  
 If **some caution indicators** exist:
-- Domain contains a known brand keyword but isn't directly related
+- Domain contains a known brand keyword but isn't directly related (make sure it isn't related to prevent false postives)
 - Unusual or overly long subdomains (e.g., "auth.secure-update-login.example.info")
 - Suspicious TLD but no clear impersonation
 - Recently registered domain with limited trust signals
@@ -102,7 +100,7 @@ List the concrete domain-level evidence:
 - \`gdgcollege.edu.in\` → 🟢 SAFE (legit local use of GDG under educational domain)
 - \`secureupdate.top\` → 🟡 SUSPICIOUS (odd TLD + generic security phrasing)
 - \`amazon.com\` → 🟢 SAFE (verified brand domain)
-
+- \`github.com\` → 🟢 SAFE (verified brand domain)
 ---
 
 Keep outputs concise, professional, and well-structured.
@@ -214,50 +212,401 @@ export interface Message {
   content: string;
   timestamp: Date;
 }
+const SYSTEM_PROMPT_SECURITY_PRO = `You are Zero Day Bot — a professional cybersecurity assistant.
 
-export async function sendMessageToGemini(messages: Message[]): Promise<string> {
+When generating a security report, do NOT include:
+- Any conversation history or chat logs.
+- Any HTML, Markdown table formatting, or JSON dumps.
+- Any raw request/response or export metadata.
+- Any instructions for LLM continuation.
+
+Focus ONLY on providing a clean, human-readable, professional security report summarizing the scan results.
+
+Structure your report like this:
+
+# 🛡️ Zero Day Security Report
+
+**Scanned URL:** {{url}}
+**Scan Time:** {{timestamp}}
+**Confidence:** {{confidence}}%
+
+---
+
+## 🔍 Summary
+A short overview (3–4 lines) summarizing whether the URL/domain appears safe, suspicious, or malicious and why.
+
+---
+
+## ⚠️ Key Findings
+List each issue clearly:
+- **Finding 1:** Short title  
+  Description (1–2 lines)  
+  Severity: 🔴 / 🟡 / 🟢  
+  Confidence: XX%
+
+(Repeat for each finding)
+
+---
+
+## 🧩 Technical Details
+Only include what's useful to the reader:
+- Domain type or host (e.g. Cloudflare, AWS, etc.)
+- SSL certificate summary
+- HTTP headers status (if available)
+- Detected issues (homograph attack, missing headers, mixed content, etc.)
+
+---
+
+## 🛠 Recommendations
+1. Actionable fix or prevention steps (for owners)
+2. Safety guidance for users
+3. Optional — reporting authorities or next steps
+
+---
+
+Keep the tone professional, concise, and clear — suitable for cybersecurity analysts or developers.
+Do NOT output HTML or JSON. Plain text only.
+
+`;
+
+
+
+// const SYSTEM_PROMPT_SECURITY = `
+// You are **Zero Day Bot**, a professional cybersecurity penetration testing and vulnerability assessment assistant.
+
+// When performing a **Website Security Scan**, your job is to simulate a full active security assessment (without actually running the tools) and produce a detailed, professional report — as if tools like **Nmap**, **Nikto**, **SQLMap**, and **OWASP ZAP** were executed.
+
+// ---
+
+// ### OBJECTIVES
+// 1. Perform a **comprehensive vulnerability analysis** of the provided website or domain.
+// 2. Summarize **network, web application, and configuration-level** security posture.
+// 3. Identify **potential attack surfaces** such as:
+//    - Open or misconfigured ports (simulate Nmap results)
+//    - Web server fingerprinting (Apache, Nginx, IIS, etc.)
+//    - SSL/TLS misconfigurations
+//    - SQL Injection, XSS, CSRF, LFI/RFI patterns (simulate SQLMap/ZAP)
+//    - Outdated technologies, frameworks, or CMS versions
+//    - Missing security headers (CSP, HSTS, X-Frame-Options, etc.)
+//    - Directory listing, robots.txt exposure
+//    - Weak authentication or input validation issues
+
+// ---
+
+// ### RESPONSE FORMAT
+
+// **Line 1:** 🧩 [Security Posture Summary – e.g., "Moderate Risk" or "High Vulnerability Exposure"]
+
+// [CONFIDENCE: XX%]
+
+// ---
+
+// ### Executive Summary
+// Concise explanation (2–3 paragraphs) of the overall findings, potential impact, and risk level for non-technical stakeholders.
+
+// ---
+
+// ### Technical Findings
+// List technical-level issues as if real tools found them:
+// - **Port Scan (Simulated Nmap)**: Open/misconfigured ports, service banners, outdated versions.
+// - **Vulnerability Scan (Simulated SQLMap / ZAP)**: Found potential injection points, insecure forms, missing sanitization.
+// - **SSL/TLS Scan**: Certificate validity, protocol versions, weak cipher suites.
+// - **Web Server & Frameworks**: Server fingerprinting, outdated software (e.g., Apache 2.2, PHP 5.x, etc.).
+// - **Security Headers**: CSP, XSS protection, CORS, HSTS presence or absence.
+// - **Information Disclosure**: Stack traces, debug info, exposed endpoints.
+// - **Authentication & Input Validation**: Weak login mechanisms, lack of MFA, plaintext data transmission.
+
+// ---
+
+// ### Evidence & Tool Simulations
+// Provide simulated but realistic outputs:
+// - Example (Nmap):  
+//   \`\`\`
+//   PORT     STATE SERVICE     VERSION
+//   22/tcp   open  ssh         OpenSSH 7.6p1 Ubuntu
+//   80/tcp   open  http        Apache 2.4.29
+//   443/tcp  open  https       nginx 1.18.0 (SSL enabled)
+//   \`\`\`
+
+// - Example (SQLMap):
+//   - Parameter "id" appears vulnerable to SQL Injection (GET /product?id=1)
+//   - Database fingerprint: MySQL 5.7.33 detected
+//   - Mitigation: Use parameterized queries or ORM-based access
+
+// ---
+
+// ### Risk Assessment
+// | Category | Severity | Description |
+// |-----------|-----------|-------------|
+// | Network Exposure | 🔴/🟡/🟢 | Based on open ports & protocols |
+// | Application Security | 🔴/🟡/🟢 | Web app input validation & injection tests |
+// | SSL/TLS Security | 🔴/🟡/🟢 | Cert validity & cipher strength |
+// | Configuration Hardening | 🔴/🟡/🟢 | Misconfigurations or missing headers |
+// | Overall Posture | 🔴/🟡/🟢 | Combined result |
+
+// ---
+
+// ### Recommendations
+// Actionable improvements:
+// - Patch outdated software
+// - Disable unnecessary services and ports
+// - Add missing headers (CSP, HSTS)
+// - Implement rate limiting and WAF
+// - Harden SSL/TLS (disable TLS 1.0, weak ciphers)
+// - Sanitize all inputs and validate server responses
+
+// ---
+
+// ### IMPORTANT RULES
+// 1. Simulate realistic vulnerability scan results — **do not invent unrelated data**.
+// 2. Avoid referencing phishing or brand impersonation — **this mode is for site security**.
+// 3. Do not attempt to fetch or scan the live website; **use reasoning and simulation**.
+// 4. Use **professional, report-style formatting** suitable for security teams and executives.
+
+// ---
+// `;
+
+
+// export async function sendMessageToGemini(messages: Message[]): Promise<string> {
+//   try {
+//     const contents = [
+//       {
+//         role: "user",
+//         parts: [{ text: SYSTEM_PROMPT }]
+//       },
+//       ...messages.map(msg => ({
+//         role: msg.role === 'user' ? 'user' : 'model',
+//         parts: [{ text: msg.content }]
+//       }))
+//     ];
+
+//     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify({
+//         contents,
+//         generationConfig: {
+//           temperature: 0.7,
+//           topK: 40,
+//           topP: 0.95,
+//           maxOutputTokens: 2048,
+//         }
+//       })
+//     });
+
+//     if (!response.ok) {
+//       const errorData = await response.json();
+//       throw new Error(`Gemini API error: ${JSON.stringify(errorData)}`);
+//     }
+
+//     const data = await response.json();
+
+//     if (!data.candidates || data.candidates.length === 0) {
+//       throw new Error('No response from Gemini API');
+//     }
+
+//     return data.candidates[0].content.parts[0].text;
+//   } catch (error) {
+//     console.error('Error calling Gemini API:', error);
+//     throw error;
+//   }
+// }
+
+
+
+
+// export async function sendMessageToGemini(messages: Message[], scanType?: 'phishing' | 'security'): Promise<string> {
+//   try {
+//     const systemPrompt = scanType === 'security' ? SYSTEM_PROMPT_SECURITY_PRO : SYSTEM_PROMPT;
+
+//     const contents = [
+//       {
+//         role: "user",
+//         parts: [{ text: systemPrompt }]
+//       },
+//       ...messages.map(msg => ({
+//         role: msg.role === 'user' ? 'user' : 'model',
+//         parts: [{ text: msg.content }]
+//       }))
+//     ];
+
+//     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+//       method: 'POST',
+//       headers: { 'Content-Type': 'application/json' },
+//       body: JSON.stringify({
+//         contents,
+//         generationConfig: {
+//           temperature: 0.7,
+//           topK: 40,
+//           topP: 0.95,
+//           maxOutputTokens: 2048,
+//         }
+//       })
+//     });
+
+//     const data = await response.json();
+//     if (!data.candidates?.length) throw new Error('No response from Gemini API');
+//     return data.candidates[0].content.parts[0].text;
+//   } catch (error) {
+//     console.error('Error calling Gemini API:', error);
+//     throw error;
+//   }
+// }
+
+// export async function sendMessageToGemini(prompt: string) {
+//   try {
+//     const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + process.env.GEMINI_API_KEY, {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//       body: JSON.stringify({
+//         contents: [
+//           {
+//             role: "user",
+//             parts: [{ text: prompt }],
+//           },
+//         ],
+//       }),
+//     });
+
+//     // 👇 Convert fetch Response → JSON
+//     const data = await res.json();
+
+//     // ✅ Safely extract text from new Gemini response schema
+//     const text =
+//       data?.candidates?.[0]?.content?.parts?.[0]?.text ??
+//       data?.candidates?.[0]?.output?.[0]?.content?.parts?.[0]?.text ??
+//       null;
+
+//     if (!text) {
+//       console.error("Invalid Gemini API response:", data);
+//       throw new Error("No valid response from Gemini API. The model might be overloaded or the request format changed.");
+//     }
+
+//     return text;
+//   } catch (err) {
+//     console.error("Error calling Gemini API:", err);
+//     throw err;
+//   }
+// }
+export async function sendMessageToGemini(prompt: string | { role: string; content: string }[]) {
+  let finalPrompt = "";
+
+  // Handle both string and array inputs
+  if (typeof prompt === "string") {
+    finalPrompt = prompt;
+  } else {
+    finalPrompt = prompt.map(m => `${m.role}: ${m.content}`).join("\n");
+  }
+
   try {
-    const contents = [
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" +
+        import.meta.env.VITE_GEMINI_API_KEY,
       {
-        role: "user",
-        parts: [{ text: SYSTEM_PROMPT }]
-      },
-      ...messages.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }]
-      }))
-    ];
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: finalPrompt }],
+            },
+          ],
+        }),
+      }
+    );
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 2048,
-        }
-      })
-    });
+    const data = await res.json();
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Gemini API error: ${JSON.stringify(errorData)}`);
+    const text =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ??
+      data?.candidates?.[0]?.output?.[0]?.content?.parts?.[0]?.text ??
+      null;
+
+    if (!text) {
+      console.error("Invalid Gemini API response:", data);
+      throw new Error("No valid response from Gemini API. The model might be overloaded or the request format changed.");
     }
 
-    const data = await response.json();
-
-    if (!data.candidates || data.candidates.length === 0) {
-      throw new Error('No response from Gemini API');
-    }
-
-    return data.candidates[0].content.parts[0].text;
-  } catch (error) {
-    console.error('Error calling Gemini API:', error);
-    throw error;
+    return text;
+  } catch (err) {
+    console.error("Error calling Gemini API:", err);
+    throw err;
   }
 }
+
+
+// export async function sendMessageToGemini(
+//   messages: Message[],
+//   scanType?: 'phishing' | 'security'
+// ): Promise<string> {
+//   try {
+//     const systemPrompt =
+//       scanType === 'security' ? SYSTEM_PROMPT_SECURITY_PRO : SYSTEM_PROMPT;
+
+//     const contents = [
+//       {
+//         role: "user",
+//         parts: [{ text: systemPrompt }]
+//       },
+//       ...messages.map(msg => ({
+//         role: msg.role === 'user' ? 'user' : 'model',
+//         parts: [{ text: msg.content }]
+//       }))
+//     ];
+
+//     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+//       method: 'POST',
+//       headers: { 'Content-Type': 'application/json' },
+//       body: JSON.stringify({
+//         contents,
+//         generationConfig: {
+//           temperature: 0.7,
+//           topK: 40,
+//           topP: 0.95,
+//           maxOutputTokens: 2048,
+//         }
+//       }),
+//     });
+
+//     if (!response.ok) {
+//       throw new Error(`Gemini API returned HTTP ${response.status}`);
+//     }
+
+//     const data = await response.json();
+
+//     // ✅ Defensive checks to prevent undefined errors
+//     // const candidate = data?.candidates?.[0];
+//     // const text = candidate?.content?.parts?.[0]?.text;
+
+//     // if (!text) {
+//     //   console.error('Invalid Gemini API response:', data);
+//     //   throw new Error(
+//     //     'No valid response from Gemini API. The model might be overloaded or the request format changed.'
+//     //   );
+//     // }
+
+//     // return text;
+// console.error("Gemini API raw response:", JSON.stringify(response, null, 2));
+
+// const candidate = response?.candidates?.[0];
+// const parts = candidate?.content?.parts;
+// const text = parts && parts[0]?.text ? parts[0].text : null;
+
+// if (!text) {
+//   console.error("Invalid Gemini API response:", response);
+//   throw new Error("No valid response from Gemini API. The model might be overloaded or the request format changed.");
+// }
+
+// return text;
+
+
+//   } catch (error) {
+//     console.error('Error calling Gemini API:', error);
+//     throw error;
+//   }
+// }
